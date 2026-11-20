@@ -37,6 +37,13 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: Apply custom icon
+        continue-on-error: true
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npm install --no-save @capacitor/assets
+          npx capacitor-assets generate --android
+
       - name: Build APK
         working-directory: ${{ env.APP_DIR }}/android
         run: |
