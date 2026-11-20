@@ -1,7 +1,8 @@
-
 name: Build VAMOS APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -23,17 +24,26 @@ jobs:
 
       - name: Prepare VAMOS
         run: |
-          unzip -q VAMOS_Phone_Build_Package.zip -d VAMOS_Android_Offline
-          cd VAMOS_Android_Offline
-          npm install
-          npx cap add android
+          unzip -q -o VAMOS_Phone_Build_Package.zip -d VAMOS_Android_Offline
+          rm -rf VAMOS_Android_Offline/__MACOSX
+          PKG=$(find VAMOS_Android_Offline -maxdepth 3 -name package.json -not -path '*/node_modules/*' | head -n1)
+          if [ -z "$PKG" ]; then echo "::error::package.json not found"; find VAMOS_Android_Offline -maxdepth 3; exit 1; fi
+          APP_DIR=$(dirname "$PKG")
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+          cd "$APP_DIR"
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build --if-present
+          [ -d android ] || npx cap add android
           npx cap sync android
 
       - name: Build APK
-        working-directory: VAMOS_Android_Offline/android
-        run: ./gradlew assembleDebug
+        working-directory: ${{ env.APP_DIR }}/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: VAMOS-APK
-          path: VAMOS_Android_Offline/android/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.APP_DIR }}/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
